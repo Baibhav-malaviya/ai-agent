@@ -7,29 +7,52 @@ load_dotenv()
 
 
 def main():
-    # This config will be reused for every call to ensure memory continuity
+    # Persistent conversation thread
     config = {"configurable": {"thread_id": "conversation_main"}}
     app = create_graph()
 
-    # Inject SystemMessage ONCE at the start
-    initial_state = {"messages": [SystemMessage(content="You are a helpful assistant named 'Villager Chat' who answers step by step.")]}
+    # ✅ Initialize full AgentState with new keys
+    initial_state = {
+        "messages": [
+            SystemMessage(
+                content=(
+                    "You are Villager Chat, a multi-agent assistant capable of handling "
+                    "multiple tasks in one query (like math, signup, and utility). "
+                    "Work step-by-step and route each intent correctly."
+                )
+            )
+        ],
+        "pending_tasks": [],       # 🧠 New: store multiple detected intents
+        "completed_tasks": [],     # 🧾 Track what has already been processed
+        "current_task": None       # 🔁 Helps manager know which task is active
+    }
 
-    # 🔑 Send initial state into the graph so it gets saved into memory
+    # Load initial context into memory
     app.invoke(initial_state, config=config)
 
-    # Now enter conversation loop
+    # Conversation loop
     while True:
         query = input("\nUser: ").strip()
-        if query.lower() in ['exit', 'quit', 'bye']:
+        if query.lower() in ["exit", "quit", "bye"]:
             print("👋 Goodbye!")
             break
 
         user_message = {"messages": [HumanMessage(content=query)]}
         result = app.invoke(user_message, config=config)
 
-        print("🤖 :", result["messages"][-1].content)
+        # Retrieve assistant message safely
+        last_msg = result["messages"][-1].content if result["messages"] else "<no response>"
+
+        # Debug (optional): Show state info for dev inspection
+        pending = result.get("pending_tasks", [])
+        completed = result.get("completed_tasks", [])
+        current = result.get("current_task", None)
+
+        print(f"\n🤖 {last_msg}")
+        print(f"🧭 Pending Tasks: {pending}")
+        print(f"✅ Completed Tasks: {completed}")
+        print(f"🎯 Current Task: {current}")
 
 
 if __name__ == "__main__":
     main()
-    # create_graph()

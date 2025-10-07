@@ -1,5 +1,5 @@
 # agent/model.py
-from typing import Type
+from typing import Type, List
 from enum import Enum
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -22,51 +22,61 @@ class RouterOptions(str, Enum):
     MATH = "math"
     UTILITY = "utility"
     END = "end"
+    AGGREGATOR = "aggregator"
+    MANAGER = "multi_intent_manager"
+
 
 def model_call(state):
     response = model.invoke(state["messages"])
     return {"messages": [response]}
 
-def get_route_path(
+def get_multi_intents(
     query: str,
     conversation_context: str,
     route_options: Type[Enum],
     model_name: str = "gpt-4o-mini"
-) -> tuple[str, str]:
-    RouteDecision = create_model(
-        "RouteDecision",
-        route=(route_options, Field(description="Chosen route based on query intent")),
-        reasoning=(str, Field(description="Explanation of why this route was chosen")),
+) -> tuple[list[str], str]:
+    """
+    Detect multiple intents in a user query (e.g., 'math', 'signup', 'utility')
+    using a structured model call.
+    """
+    MultiIntentDecision = create_model(
+        "MultiIntentDecision",
+        intents=(List[route_options], Field(description="All intents detected in the query")),
+        reasoning=(str, Field(description="Explain how these intents were identified")),
     )
 
     options_description = "\n".join(
         f"- {opt.value}: {opt.name.replace('_', ' ').title()}"
         for opt in route_options
+        if opt.value != "end"
     )
 
     prompt = f"""
-You are a routing assistant. Analyze the query and conversation context to pick the best route.
+You are an intent extraction assistant.
+Identify *all* applicable intents from the user's query.
 
-Available routes:
+Available intents:
 {options_description}
 
-Recent Conversation Context:
+Conversation Context:
 {conversation_context}
 
-Current User Query: {query}
+User Query:
+{query}
 
 Instructions:
-- Continue the same route if conversation is ongoing
-- Switch only for a clear new topic
-- Use 'end' for goodbyes like 'bye', 'thanks'
-
-Return concise route choice and reasoning.
+- Output multiple intents if the query clearly includes more than one.
+- If the query is a greeting or closing, return only that.
+- Example: "add 5 and 3 and sign me up" → ["math", "signup"]
 """
 
-    model = ChatOpenAI(model=model_name, temperature=0).with_structured_output(RouteDecision)
+    model = ChatOpenAI(model=model_name, temperature=0).with_structured_output(MultiIntentDecision)
     decision = model.invoke(prompt)
+    print(f"decision: {decision}")
 
-    return decision.route.value, decision.reasoning
+    detected_intents = [intent.value for intent in decision.intents]
+    return detected_intents, decision.reasoning
 
 
 # ============================================================================
@@ -131,7 +141,7 @@ def signup_call(state):
     response = signup_model.invoke(messages)
     return {"messages": [response]}
 
-math_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.3).bind_tools(all_tools)
+math_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.3).bind_tools(all_tools) #todo actually all_tools contains mostly math tools
 
 def math_call(state):
     messages = [SystemMessage(content=MATH_SYSTEM_PROMPT)] + state["messages"]
