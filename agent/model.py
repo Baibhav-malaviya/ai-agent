@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage
 from pydantic import create_model, Field
 
-from tools import all_tools, sign_up
+from tools import all_tools, sign_up, utility_tools
 
 load_dotenv()
 
@@ -20,6 +20,7 @@ class RouterOptions(str, Enum):
     GREETING = "greeting"
     SIGNUP = "signup"
     MATH = "math"
+    UTILITY = "utility"
     END = "end"
 
 def model_call(state):
@@ -100,6 +101,20 @@ FAREWELL_SYSTEM_PROMPT = """You are a farewell assistant.
 
 Respond concisely and naturally."""
 
+UTILITY_SYSTEM_PROMPT = """
+You are a utility assistant. 
+Use the following tools to handle user requests:
+- search_web: search for current or general information.
+- word_count: count words in a given text.
+- weather_info: get weather for a specified location.
+- get_current_datetime: return the current date and time.
+
+Always pick the most suitable tool and use it. 
+Be brief, factual, and avoid small talk or guesses.
+If a request doesn’t fit any tool, say you can only handle utility tasks.
+"""
+
+
 # ============================================================================
 
 greeting_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
@@ -128,4 +143,10 @@ farewell_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
 def farewell_call(state):
     messages = [SystemMessage(content=FAREWELL_SYSTEM_PROMPT)] + state["messages"]
     response = farewell_model.invoke(messages)
+    return {"messages": [response]}
+
+utility_model = ChatOpenAI(model='gpt-4o-mini', temperature=0.6).bind_tools(utility_tools)
+def utility_call(state):
+    messages =[SystemMessage(content=UTILITY_SYSTEM_PROMPT)] + state['messages']
+    response = utility_model.invoke(messages)
     return {"messages": [response]}

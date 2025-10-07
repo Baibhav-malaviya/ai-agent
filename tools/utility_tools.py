@@ -65,3 +65,18 @@ def weather_info(city: str) -> str:
     """
     # This remains a placeholder. You would integrate a real weather API here.
     return f"Weather in {city}: Sunny with scattered clouds, 31°C. (This is simulated data)"
+
+
+@tool("get_current_datetime", return_direct=False)
+def get_current_datetime(date_format: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """
+    Returns the current date and time.
+
+    Args:
+        date_format (str): The datetime format string. Defaults to "%Y-%m-%d %H:%M:%S".
+
+    Returns:
+        str: The current date and time formatted as per the given date_format.
+    """
+    now = datetime.datetime.now()
+    return now.strftime(date_format)

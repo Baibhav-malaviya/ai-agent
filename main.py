@@ -19,7 +19,7 @@ def main():
 
     # Now enter conversation loop
     while True:
-        query = input("\nUser: ")
+        query = input("\nUser: ").strip()
         if query.lower() in ['exit', 'quit', 'bye']:
             print("👋 Goodbye!")
             break
@@ -32,3 +32,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # create_graph()

@@ -5,11 +5,11 @@ from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage, AIMessage
 
 from .model import (
-    greeting_call, signup_call, math_call, farewell_call,
+    greeting_call, signup_call, math_call, farewell_call, utility_call,
     get_route_path, RouterOptions
 )
 from .state import AgentState
-from tools import all_tools, sign_up
+from tools import all_tools, sign_up, utility_tools
 
 
 def route_from_query(state: AgentState) -> str:
@@ -73,11 +73,12 @@ def create_graph():
     graph.add_node("greeting", greeting_call)
     graph.add_node("signup", signup_call)
     graph.add_node("math", math_call)
+    graph.add_node("utility", utility_call)
     graph.add_node("farewell", farewell_call)
 
     # --- Add tool execution node ---
     # Combine all tools for the tool node
-    all_available_tools = all_tools + [sign_up]
+    all_available_tools = all_tools + [sign_up] + utility_tools
     graph.add_node("tools", ToolNode(all_available_tools))
 
     # --- Router decides which agent to call ---
@@ -88,6 +89,7 @@ def create_graph():
             RouterOptions.GREETING.value: "greeting",
             RouterOptions.SIGNUP.value: "signup",
             RouterOptions.MATH.value: "math",
+            RouterOptions.UTILITY.value: "utility",
             RouterOptions.END.value: "farewell",  # Route to farewell agent instead of END
         },
     )
@@ -121,7 +123,15 @@ def create_graph():
             "end": END,
         }
     )
-
+    # --- After utility, check if tools needed or end ---
+    graph.add_conditional_edges(
+        "utility",
+        should_continue,
+        {
+            "tools": "tools",
+            "end": END,
+        }
+    )
     # --- After farewell, conversation ends ---
     graph.add_edge("farewell", END)
 
@@ -134,6 +144,7 @@ def create_graph():
             RouterOptions.GREETING.value: "greeting",
             RouterOptions.SIGNUP.value: "signup",
             RouterOptions.MATH.value: "math",
+            RouterOptions.UTILITY.value: "utility",
             RouterOptions.END.value: END,
         },
     )
@@ -142,4 +153,6 @@ def create_graph():
     graph.set_entry_point("router")
 
     memory = MemorySaver()
-    return graph.compile(checkpointer=memory)
+    app =  graph.compile(checkpointer=memory)
+    print(app.get_graph().draw_mermaid())
+    return app
